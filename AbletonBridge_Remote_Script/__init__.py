@@ -104,7 +104,7 @@ _MODIFYING_HANDLERS = {
     "create_midi_track": lambda song, p, ctrl: handlers.tracks.create_midi_track(song, p.get("index", -1), ctrl),
     "create_audio_track": lambda song, p, ctrl: handlers.tracks.create_audio_track(song, p.get("index", -1), ctrl),
     "create_return_track": lambda song, p, ctrl: handlers.tracks.create_return_track(song, ctrl),
-    "set_track_name": lambda song, p, ctrl: handlers.tracks.set_track_name(song, p.get("track_index", 0), p.get("name", ""), ctrl),
+    "set_track_name": lambda song, p, ctrl: handlers.tracks.set_track_name(song, p.get("track_index", 0), p.get("name", ""), ctrl, p.get("track_type", "track")),
     "delete_track": lambda song, p, ctrl: handlers.tracks.delete_track(song, p.get("track_index", 0), ctrl),
     "duplicate_track": lambda song, p, ctrl: handlers.tracks.duplicate_track(song, p.get("track_index", 0), ctrl),
     "set_track_color": lambda song, p, ctrl: handlers.tracks.set_track_color(song, p.get("track_index", 0), p.get("color_index", 0), ctrl),
@@ -121,7 +121,7 @@ _MODIFYING_HANDLERS = {
     "create_take_lane": lambda song, p, ctrl: handlers.tracks.create_take_lane(song, p.get("track_index", 0), ctrl),
     "insert_device": lambda song, p, ctrl: handlers.tracks.insert_device(
         song, p.get("track_index", 0), p.get("device_name", ""),
-        p.get("target_index"), ctrl),
+        p.get("target_index"), ctrl, p.get("track_type", "track")),
     "delete_return_track": lambda song, p, ctrl: handlers.tracks.delete_return_track(song, p.get("return_index", 0), ctrl),
     "set_track_collapse": lambda song, p, ctrl: handlers.tracks.set_track_collapse(song, p.get("track_index", 0), p.get("collapsed", True), ctrl),
     "jump_in_running_session_clip": lambda song, p, ctrl: handlers.tracks.jump_in_running_session_clip(
@@ -264,10 +264,11 @@ _MODIFYING_HANDLERS = {
     "set_compressor_sidechain": lambda song, p, ctrl: handlers.devices.set_compressor_sidechain(
         song, p.get("track_index", 0), p.get("device_index", 0),
         p.get("input_type"), p.get("input_channel"),
-        track_type=p.get("track_type", "track"), ctrl=ctrl),
+        track_type=p.get("track_type", "track"), enable=p.get("enable", True), ctrl=ctrl),
     "set_sidechain_by_name": lambda song, p, ctrl: handlers.devices.set_sidechain_by_name(
         song, p.get("track_index", 0), p.get("device_index", 0),
-        p.get("source_track_name", ""), track_type=p.get("track_type", "track"), ctrl=ctrl),
+        p.get("source_track_name", ""), track_type=p.get("track_type", "track"),
+        enable=p.get("enable", True), ctrl=ctrl),
     "set_eq8_properties": lambda song, p, ctrl: handlers.devices.set_eq8_properties(
         song, p.get("track_index", 0), p.get("device_index", 0),
         p.get("edit_mode"), p.get("global_mode"),

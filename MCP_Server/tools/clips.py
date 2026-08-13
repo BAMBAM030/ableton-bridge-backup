@@ -327,12 +327,15 @@ def register_tools(mcp):
     @_tool_handler("setting clip name")
     def set_clip_name(ctx: Context, track_index: int, clip_index: int, name: str) -> str:
         """
-        Set the name of a clip.
+        Rename a clip — set the name/label/title of a session clip in Ableton Live.
+
+        Use this to rename, relabel, or retitle any clip in the session view.
+        Equivalent to double-clicking a clip name in Ableton Live.
 
         Parameters:
         - track_index: The index of the track containing the clip
         - clip_index: The index of the clip slot containing the clip
-        - name: The new name for the clip
+        - name: The new name/label/title for the clip
         """
         _validate_index(track_index, "track_index")
         _validate_index(clip_index, "clip_index")

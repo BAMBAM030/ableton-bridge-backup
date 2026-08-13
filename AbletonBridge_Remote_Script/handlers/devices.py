@@ -654,6 +654,52 @@ def _get_sidechain_io(device):
     return None
 
 
+def _route_collection(device):
+    """Return the writable sidechain route owner and its available routes.
+
+    Live 12.4 exposes native Compressor sidechain routes in two shapes:
+    - newer DeviceIO via device.input_routings[0], writable as routing_type/channel
+    - older CompressorDevice properties, writable as input_routing_type/channel
+
+    Both appear as readable sidechain info. Prefer DeviceIO when present, but
+    keep the CompressorDevice path so existing Live sets can still be driven.
+    """
+    sidechain_io = _get_sidechain_io(device)
+    if sidechain_io is not None:
+        return {
+            "owner": sidechain_io,
+            "types_attr": "available_routing_types",
+            "channels_attr": "available_routing_channels",
+            "type_attr": "routing_type",
+            "channel_attr": "routing_channel",
+            "label": "DeviceIO",
+        }
+    if hasattr(device, "available_input_routing_types"):
+        return {
+            "owner": device,
+            "types_attr": "available_input_routing_types",
+            "channels_attr": "available_input_routing_channels",
+            "type_attr": "input_routing_type",
+            "channel_attr": "input_routing_channel",
+            "label": "CompressorDevice",
+        }
+    return None
+
+
+def _set_sidechain_enabled(device, enable=True):
+    """Enable/disable a compressor sidechain toggle when Live exposes it."""
+    target_names = ("s/c on", "sidechain", "side-chain")
+    for param in getattr(device, "parameters", []):
+        name = getattr(param, "name", "").strip().lower()
+        if name in target_names or name.endswith(" s/c on"):
+            try:
+                param.value = 1 if enable else 0
+                return True
+            except Exception:
+                return False
+    return False
+
+
 def get_compressor_sidechain(song, track_index, device_index, track_type="track", ctrl=None):
     """Get side-chain routing info from a Compressor device."""
     try:
@@ -718,39 +764,45 @@ def get_compressor_sidechain(song, track_index, device_index, track_type="track"
 
 
 def set_compressor_sidechain(song, track_index, device_index,
-                              input_type=None, input_channel=None, track_type="track", ctrl=None):
+                              input_type=None, input_channel=None, track_type="track",
+                              enable=True, ctrl=None):
     """Set side-chain routing on a Compressor device by display name.
 
-    Uses the DeviceIO path (device.input_routings[0]) which exposes writable
-    routing_type/routing_channel, unlike the read-only properties on
-    CompressorDevice itself.
+    Uses the DeviceIO path (device.input_routings[0]) when available and falls
+    back to Live's CompressorDevice input_routing_type/channel properties for
+    Live versions/sets that do not expose DeviceIO.
     """
     try:
         device = _get_compressor_device(song, track_index, device_index, track_type)
-        sidechain_io = _get_sidechain_io(device)
-        if sidechain_io is None:
+        route = _route_collection(device)
+        if route is None:
             raise RuntimeError(
                 "Cannot access sidechain routing on '{0}'. "
-                "The device does not expose input_routings (DeviceIO).".format(device.name))
+                "The device exposes neither DeviceIO nor CompressorDevice routing.".format(device.name))
+        owner = route["owner"]
         changes = {}
         if input_type is not None:
-            for rt in sidechain_io.available_routing_types:
+            routing_types = list(getattr(owner, route["types_attr"], []))
+            for rt in routing_types:
                 if str(rt.display_name) == input_type:
-                    sidechain_io.routing_type = rt
+                    setattr(owner, route["type_attr"], rt)
                     changes["input_routing_type"] = input_type
                     break
             else:
-                avail = ", ".join(str(r.display_name) for r in sidechain_io.available_routing_types)
+                avail = ", ".join(str(r.display_name) for r in routing_types)
                 raise ValueError("Input type '{0}' not found. Available: {1}".format(input_type, avail))
         if input_channel is not None:
-            for ch in sidechain_io.available_routing_channels:
+            routing_channels = list(getattr(owner, route["channels_attr"], []))
+            for ch in routing_channels:
                 if str(ch.display_name) == input_channel:
-                    sidechain_io.routing_channel = ch
+                    setattr(owner, route["channel_attr"], ch)
                     changes["input_routing_channel"] = input_channel
                     break
             else:
-                avail = ", ".join(str(r.display_name) for r in sidechain_io.available_routing_channels)
+                avail = ", ".join(str(r.display_name) for r in routing_channels)
                 raise ValueError("Input channel '{0}' not found. Available: {1}".format(input_channel, avail))
+        changes["routing_via"] = route["label"]
+        changes["sidechain_enabled"] = _set_sidechain_enabled(device, enable) if enable is not None else False
         changes["device_name"] = device.name
         changes["track_index"] = track_index
         changes["device_index"] = device_index
@@ -1674,7 +1726,8 @@ def get_device_info(song, track_index, device_index, track_type="track", ctrl=No
 # --- Sidechain by Name ---
 
 
-def set_sidechain_by_name(song, track_index, device_index, source_track_name, track_type="track", ctrl=None):
+def set_sidechain_by_name(song, track_index, device_index, source_track_name, track_type="track",
+                          enable=True, ctrl=None):
     """Set sidechain input to a specific track by name."""
     from ._helpers import get_track
     track = get_track(song, track_index, track_type)
@@ -1704,27 +1757,25 @@ def set_sidechain_by_name(song, track_index, device_index, source_track_name, tr
     if source_track is None:
         raise ValueError("Source track '{0}' not found".format(source_track_name))
 
-    # Navigate to the compressor's sidechain
-    # The sidechain routing is done through input_routing_type on the sidechain
     if not hasattr(device, 'parameters'):
         raise ValueError("Device has no parameters")
 
-    # For native Ableton compressors, we need to set the sidechain input routing
-    # This is done through the available_input_routing_types
     sidechain_set = False
+    routing_via = None
 
-    # Try to find and set sidechain via input routing types
-    try:
-        if hasattr(device, 'available_input_routing_types'):
-            routing_types = list(device.available_input_routing_types)
-            for rt in routing_types:
+    route = _route_collection(device)
+    if route is not None:
+        try:
+            owner = route["owner"]
+            for rt in getattr(owner, route["types_attr"], []):
                 rt_name = rt.display_name if hasattr(rt, 'display_name') else str(rt)
                 if source_track_name.lower() in rt_name.lower():
-                    device.input_routing_type = rt
+                    setattr(owner, route["type_attr"], rt)
                     sidechain_set = True
+                    routing_via = route["label"]
                     break
-    except Exception:
-        pass
+        except Exception:
+            pass
 
     if not sidechain_set:
         # Fallback: try to use set_compressor_sidechain with resolved index
@@ -1744,5 +1795,7 @@ def set_sidechain_by_name(song, track_index, device_index, source_track_name, tr
         "device": device.name if hasattr(device, 'name') else "",
         "sidechain_source": source_track_name,
         "source_track_index": source_track_idx,
+        "routing_via": routing_via,
+        "sidechain_enabled": _set_sidechain_enabled(device, enable) if enable is not None else False,
         "success": True,
     }

@@ -881,7 +881,8 @@ def register_tools(mcp):
     @_tool_handler("setting compressor sidechain")
     def set_compressor_sidechain(ctx: Context, track_index: int, device_index: int,
                                   input_type: str = None, input_channel: str = None,
-                                  source_track_name: str = None, track_type: str = "track") -> str:
+                                  source_track_name: str = None, track_type: str = "track",
+                                  enable: bool = True) -> str:
         """Set side-chain routing on a Compressor device.
 
         Two modes:
@@ -895,6 +896,7 @@ def register_tools(mcp):
         - input_channel: Side-chain source channel display name (e.g. 'Post FX', 'Pre FX'). Optional.
         - source_track_name: Name of the track to use as sidechain source (auto-resolves routing). Optional.
         - track_type: "track", "return", or "master" (used with source_track_name)
+        - enable: Also turn on the sidechain toggle after routing (default True).
 
         Use get_compressor_sidechain first to see available routing options.
         Works with Compressor, Glue Compressor, and Multiband Dynamics.
@@ -909,6 +911,7 @@ def register_tools(mcp):
                 "device_index": device_index,
                 "source_track_name": source_track_name,
                 "track_type": track_type,
+                "enable": enable,
             })
             return json.dumps(result)
 
@@ -917,6 +920,7 @@ def register_tools(mcp):
             params["input_type"] = input_type
         if input_channel is not None:
             params["input_channel"] = input_channel
+        params["enable"] = enable
         ableton = get_ableton_connection()
         result = ableton.send_command("set_compressor_sidechain", params)
         changes = [f"{k}={v}" for k, v in result.items()

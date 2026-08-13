@@ -166,10 +166,10 @@ def create_audio_track(song, index, ctrl=None):
         raise
 
 
-def set_track_name(song, track_index, name, ctrl=None):
+def set_track_name(song, track_index, name, ctrl=None, track_type="track"):
     """Set the name of a track."""
     try:
-        track = get_track(song, track_index)
+        track = get_track(song, track_index, track_type)
         track.name = name
         return {"name": track.name}
     except Exception as e:
@@ -635,17 +635,18 @@ def create_take_lane(song, track_index, ctrl=None):
 # --- Insert Device by Name (Live 12.3+) ---
 
 
-def insert_device(song, track_index, device_name, target_index=None, ctrl=None):
+def insert_device(song, track_index, device_name, target_index=None, ctrl=None, track_type="track"):
     """Insert a native Live device by name into a track's device chain.
 
     Args:
         track_index: Track to insert device into.
         device_name: Name of the device as shown in Live's UI.
         target_index: Position in the device chain (None = end of chain).
+        track_type: "track" (default), "return", or "master".
     Note: Only native Live devices are supported. M4L and plugins are not.
     """
     try:
-        track = get_track(song, track_index)
+        track = get_track(song, track_index, track_type)
         if not hasattr(track, "insert_device"):
             msg = "insert_device not supported (requires Live 12.3+)"
             if ctrl:

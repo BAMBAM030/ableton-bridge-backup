@@ -14,13 +14,14 @@ import MCP_Server.state as state
 logger = logging.getLogger("AbletonBridge")
 
 # Phase 4.5: Non-idempotent commands should NOT be retried automatically
-# because a retry could create duplicate tracks, clips, etc.
+# because a retry could create duplicate tracks, clips, devices, etc.
 NON_IDEMPOTENT_COMMANDS = frozenset([
     "create_midi_track", "create_audio_track", "create_clip",
     "create_return_track", "create_scene", "delete_track",
     "delete_clip", "delete_scene", "delete_device",
     "duplicate_track", "duplicate_clip", "duplicate_scene", "add_notes_to_clip",
-    "add_notes_extended", "delete_return_track",
+    "add_notes_extended", "delete_return_track", "load_instrument_or_effect",
+    "load_browser_item", "load_sample", "load_drum_kit",
 ])
 
 

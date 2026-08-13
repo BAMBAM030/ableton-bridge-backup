@@ -101,11 +101,14 @@ def register_tools(mcp):
     @_tool_handler("setting track name")
     def set_track_name(ctx: Context, track_index: int, name: str) -> str:
         """
-        Set the name of a track.
+        Rename a track — set the name/label/title of a track in Ableton Live.
+
+        Use this to rename, relabel, or retitle any track in the session.
+        Equivalent to double-clicking a track name in Ableton Live.
 
         Parameters:
         - track_index: The index of the track to rename
-        - name: The new name for the track
+        - name: The new name/label/title for the track
         """
         _validate_index(track_index, "track_index")
         ableton = get_ableton_connection()
