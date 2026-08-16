@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.amxd binary
+*.mp4 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text eol=lf
+*.lock text eol=lf

@@ -104,7 +104,7 @@ AbletonBridge is built to handle real-world sessions without crashing Ableton:
 - **Chunk reassembly hardening** — duplicate detection, progress logging, missing chunk index reporting
 - **Parameter resolution cache** — 500-entry FIFO cache for brute-force display→value resolution (O(1) after first call)
 - **Effect chain persistence** — saved templates survive server restarts via `~/.ableton-bridge/chain_templates.json`
-- **214 tests** — 11 test files covering connections, M4L, cache, creative tools, workflows, and validation edge cases
+- **218 tests** — covering connections, M4L, cache, creative tools, workflows, sidechain behavior, and validation edge cases
 
 ---
 
