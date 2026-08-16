@@ -49,5 +49,5 @@ include = ["MCP_Server*", "elevenlabs_mcp"]
 MCP_Server = ["browser_cache_seed.json", "midi_cc/*.json"]
 
 [project.urls]
-"Homepage" = "https://github.com/WilliamDeSimone/AbletonBridge"
-"Bug Tracker" = "https://github.com/WilliamDeSimone/AbletonBridge/issues"
+"Homepage" = "https://github.com/BAMBAM030/ableton-bridge-backup"
+"Bug Tracker" = "https://github.com/BAMBAM030/ableton-bridge-backup/issues"

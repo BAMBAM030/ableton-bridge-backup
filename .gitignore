@@ -21,6 +21,10 @@ env/
 # Environment / secrets
 .env
 .env.*
+!.env.example
+
+# Local-only experiments and personal scripts
+/local/
 
 # OS
 .DS_Store

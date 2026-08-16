@@ -1,7 +1,7 @@
 # AbletonBridge - Ableton Live Model Context Protocol Integration
-# Version 1.9.0
+# Version 4.0.0
 # Python >= 3.10 required
-# Repository: https://github.com/BuggedPlayer/ableton-bridge
+# Repository: https://github.com/BAMBAM030/ableton-bridge-backup
 
 # Core dependency
 mcp[cli]>=1.3.0
