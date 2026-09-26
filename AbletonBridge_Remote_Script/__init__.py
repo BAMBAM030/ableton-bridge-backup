@@ -21,6 +21,14 @@ DEFAULT_PORT = 9877
 UDP_REALTIME_PORT = 9882
 HOST = "localhost"
 
+def _required_time(p):
+    """Arrangement position must be explicit; a silent 0.0 default pollutes beat 0."""
+    t = p.get("time", p.get("destination_time"))
+    if t is None:
+        raise ValueError("duplicate_clip_to_arrangement requires 'time' (beats)")
+    return float(t)
+
+
 # -----------------------------------------------------------------------
 # Command dispatch tables
 # -----------------------------------------------------------------------
@@ -385,7 +393,7 @@ _MODIFYING_HANDLERS = {
 
     # --- Arrangement ---
     "duplicate_clip_to_arrangement": lambda song, p, ctrl: handlers.arrangement.duplicate_clip_to_arrangement(
-        song, p.get("track_index", 0), p.get("clip_index", 0), p.get("time", 0.0), ctrl),
+        song, p.get("track_index", 0), p.get("clip_index", 0), _required_time(p), ctrl),
     "move_arrangement_clip": lambda song, p, ctrl: handlers.arrangement.move_arrangement_clip(
         song, p.get("track_index", 0), p.get("clip_index_in_arrangement", 0),
         p.get("new_start_time", 0.0), ctrl),
@@ -422,6 +430,72 @@ _MODIFYING_HANDLERS = {
         p.get("action", "play"), p.get("clip_slot_index"),
         track_type=p.get("track_type", "track"), ctrl=ctrl),
 }
+
+# -----------------------------------------------------------------------
+# Protected track guard
+# -----------------------------------------------------------------------
+# Track 0 hosts the AbletonBridge M4L device. Any modifying command that
+# targets it (explicitly, or implicitly through a missing track_index that
+# would default to 0) is rejected centrally, before any handler runs.
+PROTECTED_TRACK_INDEX = 0
+_BRIDGE_DEVICE_MARKER = "AbletonBridge"
+
+
+def _lambda_param_keys(fn):
+    return set(c for c in fn.__code__.co_consts if isinstance(c, str))
+
+
+_TRACK_INDEX_COMMANDS = set(
+    k for k, f in _MODIFYING_HANDLERS.items() if "track_index" in _lambda_param_keys(f))
+_DEST_TRACK_COMMANDS = set(
+    k for k, f in _MODIFYING_HANDLERS.items() if "dest_track_index" in _lambda_param_keys(f))
+_CREATE_TRACK_COMMANDS = ("create_midi_track", "create_audio_track")
+
+
+def _is_bridge_track(track):
+    try:
+        for dev in track.devices:
+            if _BRIDGE_DEVICE_MARKER in (getattr(dev, "name", "") or ""):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _check_track_target(song, idx, cmd, key):
+    try:
+        idx = int(idx)
+    except (TypeError, ValueError):
+        return
+    if idx == PROTECTED_TRACK_INDEX:
+        raise PermissionError(
+            "{0}: {1}={2} targets protected track 0 (AbletonBridge M4L). "
+            "Pass an explicit track_index > 0.".format(cmd, key, idx))
+    try:
+        tracks = song.tracks
+        if 0 <= idx < len(tracks) and _is_bridge_track(tracks[idx]):
+            raise PermissionError(
+                "{0}: track {1} hosts the AbletonBridge M4L device and is protected".format(cmd, idx))
+    except PermissionError:
+        raise
+    except Exception:
+        pass
+
+
+def guard_protected_track(song, cmd, p):
+    """Raise PermissionError if a modifying command would touch track 0."""
+    p = p or {}
+    if cmd in _TRACK_INDEX_COMMANDS and p.get("track_type", "track") == "track":
+        _check_track_target(song, p.get("track_index", 0), cmd, "track_index")
+    if cmd in _DEST_TRACK_COMMANDS:
+        _check_track_target(song, p.get("dest_track_index", 0), cmd, "dest_track_index")
+    if cmd == "group_tracks":
+        for i in p.get("track_indices", []) or []:
+            _check_track_target(song, i, cmd, "track_indices")
+    if cmd in _CREATE_TRACK_COMMANDS and p.get("index", -1) == PROTECTED_TRACK_INDEX:
+        raise PermissionError(
+            "{0}: index=0 would insert before protected track 0; use -1 or >= 1".format(cmd))
+
 
 _READONLY_HANDLERS = {
     # --- Session ---
@@ -746,6 +820,7 @@ class AbletonBridge(ControlSurface):
         if cmd == "set_device_parameter":
             def task():
                 try:
+                    guard_protected_track(self._song, "set_device_parameter", params)
                     handlers.devices.set_device_parameter(
                         self._song,
                         params.get("track_index", 0),
@@ -765,6 +840,7 @@ class AbletonBridge(ControlSurface):
         elif cmd == "batch_set_device_parameters":
             def task():
                 try:
+                    guard_protected_track(self._song, "set_device_parameters_batch", params)
                     handlers.devices.set_device_parameters_batch(
                         self._song,
                         params.get("track_index", 0),
@@ -998,6 +1074,7 @@ class AbletonBridge(ControlSurface):
         handler = _MODIFYING_HANDLERS.get(cmd)
         if handler is None:
             raise ValueError("Unknown modifying command: {0}".format(cmd))
+        guard_protected_track(self._song, cmd, p)
         return handler(self._song, p, self)
 
     # ------------------------------------------------------------------

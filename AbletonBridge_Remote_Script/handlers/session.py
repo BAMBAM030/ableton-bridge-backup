@@ -43,13 +43,18 @@ def set_tempo(song, tempo, ctrl=None):
 
 
 def start_playback(song, ctrl=None):
-    """Start arrangement playback from the current insert/selection position."""
+    """Start playback from the current playhead position.
+
+    Song.start_playing() jumps to the Arrangement start marker and
+    Song.play_selection() does nothing without a selection, so both are
+    unreliable as a plain "Play". continue_playing() resumes exactly at
+    current_song_time (the playhead). Use navigate_playback with
+    action="play_selection" to play an explicit selection.
+    """
     try:
-        # Live's Song.start_playing() jumps to the Arrangement start marker.
-        # For editing/arrangement work Martin expects Play to start where the
-        # playhead/selection is, matching Live's "Play Selection" behavior.
-        song.play_selection()
-        return {"playing": song.is_playing, "position": song.current_song_time}
+        position = song.current_song_time
+        song.continue_playing()
+        return {"playing": song.is_playing, "position": position}
     except Exception as e:
         if ctrl:
             ctrl.log_message("Error starting playback: " + str(e))
