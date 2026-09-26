@@ -102,8 +102,25 @@ def test_start_playback_resumes_at_playhead(rs):
     res = rs.handlers.session.start_playback(song)
     song.continue_playing.assert_called_once()
     song.start_playing.assert_not_called()
-    assert song.current_song_time == 64.0   # playhead re-applied after start
+    assert song.current_song_time == 64.0   # no ctrl -> re-applied inline
     assert res["position"] == 64.0
+
+
+def test_start_playback_reapplies_playhead_on_later_ticks(rs):
+    song = MagicMock()
+    song.current_song_time = 32.0
+    ctrl = MagicMock()
+    calls = []
+    ctrl.schedule_message.side_effect = lambda delay, fn: calls.append((delay, fn))
+    rs.handlers.session.start_playback(song, ctrl)
+    assert [d for d, _ in calls] == [1, 3]
+    song.current_song_time = 5.0            # Live resumed at old stop position
+    calls[0][1]()
+    assert song.current_song_time == 32.0
+
+
+def test_udp_batch_name_is_guarded(rs):
+    assert "set_device_parameters_batch" in rs._TRACK_INDEX_COMMANDS
 
 
 def test_guard_message_reaches_client(rs):

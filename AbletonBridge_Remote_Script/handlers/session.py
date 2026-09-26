@@ -55,10 +55,25 @@ def start_playback(song, ctrl=None):
         position = song.current_song_time
         song.continue_playing()
         # Verified on Live 12.4.6: when stopped, continue_playing() resumes
-        # from the last stop position (not the playhead set via
-        # current_song_time). Re-applying the position while running jumps
-        # reliably, so the playhead wins.
-        song.current_song_time = position
+        # from the last stop position, and a current_song_time write in the
+        # same main-thread task is overwritten when the transport actually
+        # starts. Re-applying the position on the next ticks (transport
+        # running) jumps reliably.
+        def _reapply():
+            try:
+                song.current_song_time = position
+            except Exception:
+                pass
+        scheduled = False
+        if ctrl is not None and hasattr(ctrl, "schedule_message"):
+            try:
+                ctrl.schedule_message(1, _reapply)
+                ctrl.schedule_message(3, _reapply)
+                scheduled = True
+            except Exception:
+                scheduled = False
+        if not scheduled:
+            _reapply()
         return {"playing": song.is_playing, "position": position}
     except Exception as e:
         if ctrl:
