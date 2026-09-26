@@ -54,6 +54,11 @@ def start_playback(song, ctrl=None):
     try:
         position = song.current_song_time
         song.continue_playing()
+        # Verified on Live 12.4.6: when stopped, continue_playing() resumes
+        # from the last stop position (not the playhead set via
+        # current_song_time). Re-applying the position while running jumps
+        # reliably, so the playhead wins.
+        song.current_song_time = position
         return {"playing": song.is_playing, "position": position}
     except Exception as e:
         if ctrl:

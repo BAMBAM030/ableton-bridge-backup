@@ -995,7 +995,7 @@ class AbletonBridge(ControlSurface):
         TypeError -> "Invalid parameter type"
         Everything else gets a generic message; details stay in the log.
         """
-        if isinstance(e, (ValueError, IndexError)):
+        if isinstance(e, (ValueError, IndexError, PermissionError)):
             return str(e)
         if isinstance(e, KeyError):
             return "Missing required parameter: {0}".format(e)

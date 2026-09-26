@@ -102,4 +102,13 @@ def test_start_playback_resumes_at_playhead(rs):
     res = rs.handlers.session.start_playback(song)
     song.continue_playing.assert_called_once()
     song.start_playing.assert_not_called()
+    assert song.current_song_time == 64.0   # playhead re-applied after start
     assert res["position"] == 64.0
+
+
+def test_guard_message_reaches_client(rs):
+    ctrl = rs.AbletonBridge.__new__(rs.AbletonBridge) if hasattr(rs, "AbletonBridge") else None
+    if ctrl is None:
+        pytest.skip("ControlSurface class name differs")
+    msg = ctrl._safe_error_message(PermissionError("protected track 0"))
+    assert "protected track 0" in msg
