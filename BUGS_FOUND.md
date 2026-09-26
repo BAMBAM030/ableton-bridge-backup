@@ -138,3 +138,9 @@ and pollutes the arrangement instead of erroring out.
 `set_song_time` reports success and `get_song_transport` confirms the new position, but
 starting playback jumps back to beat 0. Any measurement taken "at beat X" is therefore
 invalid unless the playhead is sampled via `get_song_transport.current_time`.
+
+**Fixed in fork (commit `2dbd1e3`, verified on Live 12.4.6):** `start_playback` calls
+`continue_playing()` and re-applies the playhead via `schedule_message` on the next ticks.
+A `current_song_time` write in the same main-thread task is overwritten when the
+transport starts. Verified: playhead 32 -> 34.4 after 0.5 s / 38.4 after 1.5 s;
+playhead 64 -> 66.6 / 70.5 (130 BPM), with a different previous stop position.
