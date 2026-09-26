@@ -66,15 +66,18 @@ def create_clip_automation(song, track_index, clip_index, parameter_name, automa
             except Exception:
                 pass
 
-        # Insert breakpoints — Ableton linearly interpolates between them.
-        # Use duration=0 to create simple breakpoints (not held steps).
+        # Live ignores zero-duration steps without raising. A tiny positive
+        # duration creates a real breakpoint; callers may request a longer
+        # hold explicitly via ``duration``.
         clip_length = clip.length
         for point in automation_points:
             time_val = float(point.get("time", 0.0))
             time_val = max(0.0, min(clip_length - 0.001, time_val))
             value = float(point.get("value", 0.0))
             clamped = max(param.min, min(param.max, value))
-            envelope.insert_step(time_val, 0.0, clamped)
+            duration = float(point.get("duration", 0.001))
+            duration = max(0.001, min(clip_length - time_val, duration))
+            envelope.insert_step(time_val, duration, clamped)
 
         return {
             "parameter": parameter_name,
@@ -286,7 +289,9 @@ def create_track_automation(song, track_index, parameter_name, automation_points
         for point in automation_points:
             time_val = max(clip_start, min(clip_end - 0.001, float(point.get("time", 0.0))))
             value = max(parameter.min, min(parameter.max, float(point.get("value", 0.0))))
-            envelope.insert_step(time_val, 0.0, value)
+            duration = float(point.get("duration", 0.001))
+            duration = max(0.001, min(clip_end - time_val, duration))
+            envelope.insert_step(time_val, duration, value)
 
         return {
             "parameter": parameter_name,

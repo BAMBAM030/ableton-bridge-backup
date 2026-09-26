@@ -81,3 +81,60 @@ These four issues have been reproduced repeatedly in real sessions. Each section
 - All four are reproducible on Live 12.4.3; none appear caused by the 12.4.3 update (that release only touched Re-Pitch groove handling and control-surface mappings — no LOM/M4L changes).
 - Issues 1 and 4 have clean, low-risk fixes. Issues 2 and 3 need a look at the caching/dispatch layer.
 - Happy to test candidate fixes against a live 12.4.3 Suite session.
+
+---
+
+## Issue 5 — `create_track_automation` cannot automate Arrangement clips
+
+**Severity:** High (feature is advertised but unusable for Arrangement automation)
+
+**Environment:** macOS · Ableton Live 12.4.5 (2026-08-19 build) · active script at `~/Music/Ableton/User Library/Remote Scripts/AbletonBridge/`.
+
+**Where:** `handlers/automation.py:create_track_automation`, specifically the call to `target_clip.create_automation_envelope(parameter)`.
+
+**Symptom:** Every Arrangement automation write fails before creating an envelope. Live reports: `RuntimeError: Not a session clip or parameter belongs to another track.` This occurs for both device parameters and mixer parameters, including a clip that begins at beat 0.
+
+**Minimal repro:**
+1. Put a MIDI clip in Arrangement view.
+2. Call `create_track_automation(track_index=4, parameter_name="Volume", automation_points=[{"time": 0.01, "value": 0.49}, {"time": 14.0, "value": 0.59}])`.
+3. Read `get_arrangement_clip_info(track_index=4, clip_index_in_arrangement=0)`.
+4. The command returns `Internal error`; `has_envelopes` remains `false`.
+5. Live Log contains the exception at `handlers/automation.py:280` during `create_automation_envelope`.
+
+**Confirmed controls:** The failure repeats for Kick/Saturator `Drive` on an Arrangement clip beginning at beat 16 and Perc/Mixer `Volume` on a clip beginning at beat 0. It is neither a parameter-name nor a song-time/clip-time conversion issue.
+
+**Suggested fix:** Do not present this path as supported until the Live 12.4.5 LOM offers a valid Arrangement-envelope owner/API. Add a capability check that returns the exact Live limitation without attempting `create_automation_envelope` on an Arrangement clip. Keep the existing Session `create_step_automation` path separate. A valid implementation needs a Live-supported Arrangement automation API rather than a Session Clip envelope call.
+
+## create_track_automation is broken (arrangement automation impossible)
+
+`create_track_automation` always fails with:
+
+```
+RuntimeError: Not a session clip or parameter belongs to another track.
+  File ".../handlers/automation.py", line 280, in create_track_automation
+    if hasattr(target_clip, "automation_envelope"):
+```
+
+Cause: `Clip.automation_envelope()` is only valid on **session** clips. The handler
+picks an arrangement clip and calls `automation_envelope(parameter)` on it, which the
+Live API rejects. Arrangement automation needs track/song-level envelopes instead.
+
+Verified separately: session-clip envelopes do **not** survive
+`duplicate_clip_to_arrangement` — only notes are copied. Test with the Auto Filter LFO
+set to 0 showed a constant cutoff (0.52) across the whole duplicated clip, while the
+source session clip carried a 0.46/0.72/0.54/0.46 envelope.
+
+Consequence: the bridge currently cannot write any automation that is audible in the
+Arrangement view. Device-intrinsic modulation (Auto Filter LFO, Echo Mod, Beat Repeat
+Variation) is the working alternative.
+
+## duplicate_clip_to_arrangement: parameter is `time`, not `destination_time`
+
+An unknown key is silently ignored and defaults to `0.0`, so the clip lands on beat 0
+and pollutes the arrangement instead of erroring out.
+
+## start_playback / continue_playing ignore the playhead position
+
+`set_song_time` reports success and `get_song_transport` confirms the new position, but
+starting playback jumps back to beat 0. Any measurement taken "at beat X" is therefore
+invalid unless the playhead is sampled via `get_song_transport.current_time`.

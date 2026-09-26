@@ -43,10 +43,13 @@ def set_tempo(song, tempo, ctrl=None):
 
 
 def start_playback(song, ctrl=None):
-    """Start playing the session."""
+    """Start arrangement playback from the current insert/selection position."""
     try:
-        song.start_playing()
-        return {"playing": song.is_playing}
+        # Live's Song.start_playing() jumps to the Arrangement start marker.
+        # For editing/arrangement work Martin expects Play to start where the
+        # playhead/selection is, matching Live's "Play Selection" behavior.
+        song.play_selection()
+        return {"playing": song.is_playing, "position": song.current_song_time}
     except Exception as e:
         if ctrl:
             ctrl.log_message("Error starting playback: " + str(e))
